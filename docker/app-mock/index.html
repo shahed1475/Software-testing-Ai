@@ -1,0 +1,1339 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Application - Software Testing AI</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        
+        header {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border-radius: 15px;
+            padding: 20px;
+            margin-bottom: 30px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+        }
+        
+        nav {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+        
+        .logo {
+            font-size: 24px;
+            font-weight: bold;
+            color: #667eea;
+        }
+        
+        .nav-links {
+            display: flex;
+            list-style: none;
+            gap: 2rem;
+            margin: 0;
+            padding: 0;
+        }
+
+        .nav-links a {
+            text-decoration: none;
+            color: #333;
+            font-weight: 500;
+            padding: 0.5rem 1rem;
+            border-radius: 5px;
+            transition: all 0.3s ease;
+            position: relative;
+        }
+
+        .nav-links a:hover,
+        .nav-links a:focus {
+            background-color: #667eea;
+            color: white;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+        }
+
+        .mobile-menu-toggle {
+            display: none;
+            flex-direction: column;
+            cursor: pointer;
+            padding: 5px;
+            background: none;
+            border: none;
+        }
+
+        .mobile-menu-toggle span {
+            width: 25px;
+            height: 3px;
+            background-color: #333;
+            margin: 3px 0;
+            transition: 0.3s;
+            border-radius: 2px;
+        }
+
+        .mobile-menu-toggle.active span:nth-child(1) {
+            transform: rotate(-45deg) translate(-5px, 6px);
+        }
+
+        .mobile-menu-toggle.active span:nth-child(2) {
+            opacity: 0;
+        }
+
+        .mobile-menu-toggle.active span:nth-child(3) {
+            transform: rotate(45deg) translate(-5px, -6px);
+        }
+
+        @media (max-width: 768px) {
+            nav {
+                position: relative;
+            }
+
+            .mobile-menu-toggle {
+                display: flex;
+            }
+
+            .nav-links {
+                position: absolute;
+                top: 100%;
+                left: 0;
+                right: 0;
+                background: white;
+                flex-direction: column;
+                gap: 0;
+                box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+                border-radius: 8px;
+                margin-top: 10px;
+                padding: 1rem;
+                transform: translateY(-10px);
+                opacity: 0;
+                visibility: hidden;
+                transition: all 0.3s ease;
+                z-index: 1000;
+            }
+
+            .nav-links.active {
+                transform: translateY(0);
+                opacity: 1;
+                visibility: visible;
+            }
+
+            .nav-links li {
+                width: 100%;
+            }
+
+            .nav-links a {
+                display: block;
+                padding: 1rem;
+                border-radius: 8px;
+                text-align: center;
+            }
+        }
+        
+        .auth-buttons {
+            display: flex;
+            gap: 10px;
+        }
+        
+        .btn {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            text-decoration: none;
+            display: inline-block;
+            transition: all 0.3s ease;
+            font-weight: 500;
+        }
+        
+        .btn-primary {
+            background: #667eea;
+            color: white;
+        }
+        
+        .btn-secondary {
+            background: transparent;
+            color: #667eea;
+            border: 2px solid #667eea;
+        }
+        
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+        }
+        
+        .hero {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border-radius: 15px;
+            padding: 40px;
+            text-align: center;
+            margin-bottom: 30px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+        }
+        
+        .hero h1 {
+            font-size: 3rem;
+            margin-bottom: 20px;
+            color: #333;
+        }
+        
+        .hero p {
+            font-size: 1.2rem;
+            margin-bottom: 30px;
+            color: #666;
+        }
+        
+        .search-container {
+            max-width: 800px;
+            margin: 2rem auto;
+            padding: 0 1rem;
+        }
+
+        .search-bar {
+            display: flex;
+            gap: 0;
+            margin-bottom: 1rem;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+            border-radius: 50px;
+            overflow: hidden;
+            background: white;
+        }
+
+        .search-bar input {
+            flex: 1;
+            padding: 1rem 1.5rem;
+            border: none;
+            outline: none;
+            font-size: 1rem;
+            background: transparent;
+        }
+
+        .search-bar button {
+            padding: 1rem 1.5rem;
+            background: #667eea;
+            color: white;
+            border: none;
+            cursor: pointer;
+            font-size: 1.2rem;
+            transition: all 0.3s ease;
+            min-width: 60px;
+        }
+
+        .search-bar button:hover,
+        .search-bar button:focus {
+            background: #5a67d8;
+            transform: scale(1.05);
+        }
+
+        .filters {
+            display: flex;
+            gap: 1rem;
+            justify-content: center;
+            flex-wrap: wrap;
+            margin-bottom: 2rem;
+        }
+
+        .filters select,
+        .filters button {
+            padding: 0.75rem 1rem;
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            background: white;
+            font-size: 0.9rem;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .filters select:hover,
+        .filters select:focus,
+        .filters button:hover,
+        .filters button:focus {
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+            outline: none;
+        }
+
+        .filters button {
+            background: #667eea;
+            color: white;
+            border-color: #667eea;
+        }
+
+        .filters button:hover {
+            background: #5a67d8;
+            transform: translateY(-2px);
+        }
+
+        .search-results {
+            background: white;
+            border-radius: 15px;
+            padding: 2rem;
+            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.1);
+            margin-top: 2rem;
+        }
+
+        .search-results h3 {
+            color: #333;
+            margin-bottom: 1rem;
+            font-size: 1.3rem;
+        }
+
+        .result-item {
+            padding: 1.5rem;
+            border: 1px solid #eee;
+            border-radius: 10px;
+            margin-bottom: 1rem;
+            transition: all 0.3s ease;
+            cursor: pointer;
+        }
+
+        .result-item:hover {
+            border-color: #667eea;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.1);
+        }
+
+        .result-title {
+            font-weight: bold;
+            color: #667eea;
+            margin-bottom: 0.5rem;
+            font-size: 1.1rem;
+        }
+
+        .result-description {
+            color: #666;
+            line-height: 1.5;
+            margin-bottom: 0.5rem;
+        }
+
+        .result-meta {
+            display: flex;
+            gap: 1rem;
+            font-size: 0.8rem;
+            color: #999;
+            flex-wrap: wrap;
+        }
+
+        .no-results {
+            text-align: center;
+            padding: 3rem;
+            color: #666;
+        }
+
+        .no-results h3 {
+            margin-bottom: 1rem;
+            color: #333;
+        }
+        
+        .features {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+        
+        .feature-card {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border-radius: 15px;
+            padding: 30px;
+            text-align: center;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+            transition: transform 0.3s ease;
+        }
+        
+        .feature-card:hover {
+            transform: translateY(-5px);
+        }
+        
+        .feature-icon {
+            font-size: 3rem;
+            margin-bottom: 20px;
+        }
+        
+        .filters {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border-radius: 15px;
+            padding: 20px;
+            margin-bottom: 30px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+        }
+        
+        .filter-group {
+            display: flex;
+            gap: 15px;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+        
+        .filter-group label {
+            font-weight: 500;
+        }
+        
+        .filter-group select {
+            padding: 8px 12px;
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            outline: none;
+        }
+        
+        .contact-form {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border-radius: 15px;
+            padding: 30px;
+            margin-bottom: 30px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+        }
+        
+        .form-group {
+            margin-bottom: 20px;
+        }
+        
+        .form-group label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: 500;
+        }
+        
+        .form-group input,
+        .form-group textarea {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            outline: none;
+            transition: border-color 0.3s ease;
+        }
+        
+        .form-group input:focus,
+        .form-group textarea:focus {
+            border-color: #667eea;
+        }
+        
+        .newsletter {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border-radius: 15px;
+            padding: 30px;
+            text-align: center;
+            margin-bottom: 30px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+        }
+        
+        .newsletter-form {
+            display: flex;
+            gap: 10px;
+            max-width: 400px;
+            margin: 20px auto 0;
+        }
+        
+        .newsletter-input {
+            flex: 1;
+            padding: 12px;
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            outline: none;
+        }
+        
+        footer {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border-radius: 15px;
+            padding: 30px;
+            text-align: center;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+        }
+        
+        .social-links {
+            display: flex;
+            justify-content: center;
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+        
+        .social-links a {
+            color: #667eea;
+            font-size: 1.5rem;
+            text-decoration: none;
+            transition: color 0.3s ease;
+        }
+        
+        .social-links a:hover {
+            color: #764ba2;
+        }
+        
+        .user-content {
+            display: none;
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border-radius: 15px;
+            padding: 30px;
+            margin-bottom: 30px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+        }
+        
+        .user-content.show {
+            display: block;
+        }
+        
+        /* Search Results Styling */
+        #searchResults {
+            display: none;
+            margin-top: 20px;
+            padding: 20px;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+            border: 1px solid #e0e0e0;
+        }
+
+        #searchResults h3 {
+            color: #2c3e50;
+            margin-bottom: 20px;
+            font-size: 1.4rem;
+            font-weight: 600;
+        }
+
+        .result-item {
+            padding: 20px;
+            margin-bottom: 15px;
+            background: #f8f9fa;
+            border-radius: 8px;
+            border-left: 4px solid #3498db;
+            transition: all 0.3s ease;
+        }
+
+        .result-item:hover {
+            background: #e9ecef;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+        }
+
+        .result-title {
+            font-size: 1.2rem;
+            font-weight: 600;
+            color: #2c3e50;
+            margin-bottom: 8px;
+        }
+
+        .result-description {
+            color: #555;
+            line-height: 1.6;
+            margin-bottom: 12px;
+        }
+
+        .result-meta {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 15px;
+            font-size: 0.9rem;
+            color: #666;
+        }
+
+        .result-meta span {
+            background: #e3f2fd;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-weight: 500;
+        }
+
+        .no-results {
+            text-align: center;
+            padding: 40px 20px;
+            color: #666;
+        }
+
+        .no-results h3 {
+            color: #e74c3c;
+            margin-bottom: 10px;
+        }
+
+        /* Enhanced Button Styles */
+        .auth-buttons button {
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .auth-buttons button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+        }
+
+        .auth-buttons button:active {
+            transform: translateY(0);
+        }
+
+        /* Enhanced Form Styles */
+        .contact-form input:focus,
+        .contact-form textarea:focus,
+        .newsletter-form input:focus {
+            outline: none;
+            border-color: #3498db;
+            box-shadow: 0 0 0 3px rgba(52, 152, 219, 0.1);
+            transform: translateY(-1px);
+        }
+
+        /* Loading Animation */
+        .loading {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #3498db;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        /* Mobile Menu Toggle */
+        .mobile-menu-toggle {
+            display: none;
+            flex-direction: column;
+            cursor: pointer;
+            padding: 8px;
+            border: none;
+            background: none;
+            color: white;
+        }
+
+        .mobile-menu-toggle span {
+            width: 25px;
+            height: 3px;
+            background: white;
+            margin: 3px 0;
+            transition: 0.3s;
+            border-radius: 2px;
+        }
+
+        .mobile-menu-toggle.active span:nth-child(1) {
+            transform: rotate(-45deg) translate(-5px, 6px);
+        }
+
+        .mobile-menu-toggle.active span:nth-child(2) {
+            opacity: 0;
+        }
+
+        .mobile-menu-toggle.active span:nth-child(3) {
+            transform: rotate(45deg) translate(-5px, -6px);
+        }
+
+        /* Enhanced Search and Filter Styles */
+        .search-input:focus,
+        .filter-select:focus {
+            outline: none;
+            border-color: #3498db;
+            box-shadow: 0 0 0 3px rgba(52, 152, 219, 0.1);
+            transform: translateY(-1px);
+        }
+
+        .search-btn:hover {
+            background: #2980b9;
+            transform: translateY(-1px);
+        }
+
+        .apply-filters:hover {
+            background: #27ae60;
+            transform: translateY(-1px);
+        }
+
+        /* Responsive Design */
+        @media (max-width: 768px) {
+            .mobile-menu-toggle {
+                display: flex;
+            }
+
+            .nav-links {
+                position: fixed;
+                top: 80px;
+                left: -100%;
+                width: 100%;
+                height: calc(100vh - 80px);
+                background: rgba(44, 62, 80, 0.95);
+                backdrop-filter: blur(10px);
+                flex-direction: column;
+                justify-content: flex-start;
+                align-items: center;
+                padding-top: 50px;
+                transition: left 0.3s ease;
+                z-index: 999;
+            }
+
+            .nav-links.active {
+                left: 0;
+            }
+
+            .nav-links li {
+                margin: 20px 0;
+            }
+
+            .nav-links a {
+                font-size: 1.2rem;
+                padding: 15px 30px;
+                border-radius: 8px;
+                transition: all 0.3s ease;
+            }
+
+            .nav-links a:hover {
+                background: rgba(255, 255, 255, 0.1);
+            }
+
+            .hero h1 {
+                font-size: 2rem;
+            }
+            
+            .filter-group {
+                flex-direction: column;
+                align-items: flex-start;
+            }
+            
+            .newsletter-form {
+                flex-direction: column;
+            }
+            
+            .filters {
+                flex-direction: column;
+                align-items: stretch;
+            }
+
+            .filters select,
+            .filters button {
+                width: 100%;
+            }
+
+            .search-container {
+                flex-direction: column;
+                gap: 15px;
+            }
+
+            .search-bar {
+                flex-direction: column;
+                gap: 10px;
+                border-radius: 25px;
+            }
+
+            .result-meta {
+                flex-direction: column;
+                gap: 8px;
+            }
+
+            .auth-buttons {
+                flex-wrap: wrap;
+                gap: 8px;
+            }
+
+            .auth-buttons button {
+                font-size: 0.9rem;
+                padding: 8px 16px;
+            }
+
+            .result-item {
+                padding: 15px;
+            }
+
+            .result-title {
+                font-size: 1.1rem;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .container {
+                padding: 0 15px;
+            }
+
+            .hero h1 {
+                font-size: 2rem;
+            }
+
+            .hero p {
+                font-size: 1rem;
+            }
+
+            .feature-card {
+                margin-bottom: 20px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <nav>
+                <div class="logo" data-testid="logo">Testing AI</div>
+                <ul class="nav-links" data-testid="navigation">
+                    <li><a href="#home" data-testid="nav-home" aria-label="Navigate to Home section">Home</a></li>
+                    <li><a href="#features" data-testid="nav-features" aria-label="Navigate to Features section">Features</a></li>
+                    <li><a href="#about" data-testid="nav-about" aria-label="Navigate to About section">About</a></li>
+                    <li><a href="#contact" data-testid="nav-contact" aria-label="Navigate to Contact section">Contact</a></li>
+                </ul>
+                <div class="mobile-menu-toggle" data-testid="mobile-menu-toggle" aria-label="Toggle mobile menu">
+                    <span></span>
+                    <span></span>
+                    <span></span>
+                </div>
+                <div id="searchResults"></div>
+                <div class="auth-buttons" data-testid="auth-section">
+                    <button class="btn btn-secondary" id="loginBtn" data-testid="login-button" aria-label="Login to your account">Login</button>
+                    <button class="btn btn-primary" id="signupBtn" data-testid="signup-button" aria-label="Create new account">Sign Up</button>
+                    <button class="btn btn-secondary" id="logoutBtn" data-testid="logout-button" style="display: none;" aria-label="Logout from your account">Logout</button>
+                    <button class="btn btn-primary" id="profileBtn" data-testid="profile-button" style="display: none;" aria-label="View your profile">Profile</button>
+                </div>
+            </nav>
+        </header>
+
+        <main>
+            <section class="hero" data-testid="hero-section">
+                <h1 data-testid="main-heading">Welcome to Testing AI</h1>
+                <p data-testid="hero-description">Advanced AI-powered software testing framework for modern applications</p>
+                
+                <div class="search-container" data-testid="search-section">
+                    <div class="search-bar">
+                        <input type="text" id="searchInput" placeholder="Search for testing tools, tutorials, or documentation..." data-testid="search-input" aria-label="Search for testing tools and resources">
+                        <button id="searchBtn" data-testid="search-button" aria-label="Execute search">🔍</button>
+                    </div>
+                    <div class="filters">
+                        <select id="categoryFilter" data-testid="category-filter" aria-label="Filter by category">
+                            <option value="">All Categories</option>
+                            <option value="automation">Test Automation</option>
+                            <option value="performance">Performance Testing</option>
+                            <option value="security">Security Testing</option>
+                            <option value="api">API Testing</option>
+                            <option value="mobile">Mobile Testing</option>
+                            <option value="tools">Testing Tools</option>
+                        </select>
+                        <select id="sortFilter" data-testid="sort-filter" aria-label="Sort results by">
+                            <option value="relevance">Sort by Relevance</option>
+                            <option value="date">Sort by Date</option>
+                            <option value="popularity">Sort by Popularity</option>
+                            <option value="rating">Sort by Rating</option>
+                        </select>
+                        <button id="applyFilters" data-testid="apply-filters" aria-label="Apply selected filters">Apply Filters</button>
+                    </div>
+                    <div id="searchResults" class="search-results" data-testid="search-results" style="display: none;">
+                        <!-- Search results will be populated here -->
+                    </div>
+                </div>
+            </section>
+
+            <section class="filters" data-testid="filters-section">
+                <div class="filter-group">
+                    <label for="categoryFilter">Category:</label>
+                    <select id="categoryFilter" data-testid="category-filter">
+                        <option value="">All Categories</option>
+                        <option value="web">Web Testing</option>
+                        <option value="api">API Testing</option>
+                        <option value="mobile">Mobile Testing</option>
+                        <option value="performance">Performance Testing</option>
+                    </select>
+                    
+                    <label for="sortBy">Sort by:</label>
+                    <select id="sortBy" data-testid="sort-filter">
+                        <option value="name">Name</option>
+                        <option value="date">Date</option>
+                        <option value="popularity">Popularity</option>
+                    </select>
+                    
+                    <button class="btn btn-primary" id="applyFilters" data-testid="apply-filters">Apply Filters</button>
+                </div>
+            </section>
+
+            <section class="features" id="features" data-testid="features-section">
+                <div class="feature-card" data-testid="feature-web-testing">
+                    <div class="feature-icon">🌐</div>
+                    <h3>Web Testing</h3>
+                    <p>Comprehensive web application testing with Playwright and advanced automation capabilities.</p>
+                </div>
+                
+                <div class="feature-card" data-testid="feature-api-testing">
+                    <div class="feature-icon">🔌</div>
+                    <h3>API Testing</h3>
+                    <p>Robust API testing framework with support for REST, GraphQL, and WebSocket protocols.</p>
+                </div>
+                
+                <div class="feature-card" data-testid="feature-mobile-testing">
+                    <div class="feature-icon">📱</div>
+                    <h3>Mobile Testing</h3>
+                    <p>Cross-platform mobile testing for iOS and Android applications using Appium integration.</p>
+                </div>
+                
+                <div class="feature-card" data-testid="feature-performance">
+                    <div class="feature-icon">⚡</div>
+                    <h3>Performance Testing</h3>
+                    <p>Advanced performance monitoring and load testing capabilities for optimal application performance.</p>
+                </div>
+                
+                <div class="feature-card" data-testid="feature-security">
+                    <div class="feature-icon">🔒</div>
+                    <h3>Security Testing</h3>
+                    <p>Integrated security testing with OWASP ZAP and vulnerability assessment tools.</p>
+                </div>
+                
+                <div class="feature-card" data-testid="feature-reporting">
+                    <div class="feature-icon">📊</div>
+                    <h3>Advanced Reporting</h3>
+                    <p>Beautiful HTML reports, Allure integration, and real-time notifications via Slack and email.</p>
+                </div>
+            </section>
+
+            <section class="user-content" id="userContent" data-testid="user-content">
+                <h2>Welcome back, Test User!</h2>
+                <p>Here's your personalized dashboard with recent test results and recommendations.</p>
+                <div class="user-stats">
+                    <p><strong>Tests Run:</strong> <span data-testid="user-tests-count">42</span></p>
+                    <p><strong>Success Rate:</strong> <span data-testid="user-success-rate">95%</span></p>
+                    <p><strong>Last Login:</strong> <span data-testid="user-last-login">2024-01-15 10:30 AM</span></p>
+                </div>
+            </section>
+
+            <section class="contact-form" id="contact" data-testid="contact-section">
+                <h2>Contact Us</h2>
+                <form id="contactForm" data-testid="contact-form">
+                    <div class="form-group">
+                        <label for="name">Name:</label>
+                        <input type="text" id="name" name="name" required data-testid="contact-name">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="email">Email:</label>
+                        <input type="email" id="email" name="email" required data-testid="contact-email">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="message">Message:</label>
+                        <textarea id="message" name="message" rows="5" required data-testid="contact-message"></textarea>
+                    </div>
+                    
+                    <button type="submit" class="btn btn-primary" data-testid="contact-submit">Send Message</button>
+                </form>
+            </section>
+
+            <section class="newsletter" data-testid="newsletter-section">
+                <h2>Stay Updated</h2>
+                <p>Subscribe to our newsletter for the latest updates and testing insights.</p>
+                <form class="newsletter-form" id="newsletterForm" data-testid="newsletter-form">
+                    <input type="email" class="newsletter-input" placeholder="Enter your email" required data-testid="newsletter-email">
+                    <button type="submit" class="btn btn-primary" data-testid="newsletter-submit">Subscribe</button>
+                </form>
+            </section>
+        </main>
+
+        <footer data-testid="footer">
+            <div class="social-links" data-testid="social-links">
+                <a href="#" data-testid="social-twitter">🐦 Twitter</a>
+                <a href="#" data-testid="social-github">🐙 GitHub</a>
+                <a href="#" data-testid="social-linkedin">💼 LinkedIn</a>
+                <a href="#" data-testid="social-discord">💬 Discord</a>
+            </div>
+            <p data-testid="footer-text">&copy; 2024 Software Testing AI. All rights reserved.</p>
+            <p data-testid="contact-info">Email: contact@testingai.com | Phone: +1 (555) 123-4567</p>
+        </footer>
+    </div>
+
+    <script>
+        // DOM Elements
+        const loginBtn = document.getElementById('loginBtn');
+        const signupBtn = document.getElementById('signupBtn');
+        const logoutBtn = document.getElementById('logoutBtn');
+        const profileBtn = document.getElementById('profileBtn');
+        const userContent = document.getElementById('userContent');
+        const searchInput = document.getElementById('searchInput');
+        const searchBtn = document.getElementById('searchBtn');
+        const searchResults = document.getElementById('searchResults');
+        const categoryFilter = document.getElementById('categoryFilter');
+        const sortFilter = document.getElementById('sortFilter');
+        const applyFiltersBtn = document.getElementById('applyFilters');
+        const contactForm = document.getElementById('contactForm');
+        const newsletterForm = document.getElementById('newsletterForm');
+        const mobileMenuToggle = document.querySelector('.mobile-menu-toggle');
+        const navLinks = document.querySelector('.nav-links');
+
+        // Authentication state
+        let isLoggedIn = localStorage.getItem('isLoggedIn') === 'true';
+        let currentUser = {
+            name: localStorage.getItem('userName') || '',
+            email: localStorage.getItem('userEmail') || ''
+        };
+
+        // Mock search data
+        const mockSearchData = [
+            {
+                title: "Selenium WebDriver Tutorial",
+                description: "Complete guide to automated web testing with Selenium WebDriver. Learn how to write robust test scripts.",
+                category: "automation",
+                date: "2024-01-15",
+                popularity: 95,
+                rating: 4.8
+            },
+            {
+                title: "API Testing with Postman",
+                description: "Master API testing techniques using Postman. Includes authentication, data validation, and automation.",
+                category: "api",
+                date: "2024-01-10",
+                popularity: 88,
+                rating: 4.6
+            },
+            {
+                title: "Performance Testing Best Practices",
+                description: "Learn how to conduct effective performance testing using JMeter and other tools.",
+                category: "performance",
+                date: "2024-01-08",
+                popularity: 82,
+                rating: 4.7
+            },
+            {
+                title: "Security Testing Fundamentals",
+                description: "Essential security testing concepts and tools for identifying vulnerabilities in web applications.",
+                category: "security",
+                date: "2024-01-05",
+                popularity: 79,
+                rating: 4.5
+            },
+            {
+                title: "Mobile App Testing Guide",
+                description: "Comprehensive guide to testing mobile applications on iOS and Android platforms.",
+                category: "mobile",
+                date: "2024-01-03",
+                popularity: 76,
+                rating: 4.4
+            },
+            {
+                title: "Cypress Testing Framework",
+                description: "Modern end-to-end testing framework for web applications. Fast, reliable, and developer-friendly.",
+                category: "automation",
+                date: "2024-01-01",
+                popularity: 91,
+                rating: 4.9
+            }
+        ];
+
+        // Authentication functions
+        function login() {
+            window.location.href = 'login.html';
+        }
+
+        function signup() {
+            window.location.href = 'signup.html';
+        }
+
+        function logout() {
+            localStorage.removeItem('isLoggedIn');
+            localStorage.removeItem('userEmail');
+            localStorage.removeItem('userName');
+            isLoggedIn = false;
+            currentUser = { name: '', email: '' };
+            updateAuthUI();
+            showNotification('Logged out successfully!', 'success');
+        }
+
+        function goToProfile() {
+            if (isLoggedIn) {
+                window.location.href = 'profile.html';
+            } else {
+                showNotification('Please log in to access your profile.', 'error');
+            }
+        }
+
+        function updateAuthUI() {
+            if (isLoggedIn && currentUser.name) {
+                loginBtn.style.display = 'none';
+                signupBtn.style.display = 'none';
+                logoutBtn.style.display = 'inline-block';
+                profileBtn.style.display = 'inline-block';
+                profileBtn.textContent = currentUser.name;
+                if (userContent) {
+                    userContent.style.display = 'block';
+                }
+            } else {
+                loginBtn.style.display = 'inline-block';
+                signupBtn.style.display = 'inline-block';
+                logoutBtn.style.display = 'none';
+                profileBtn.style.display = 'none';
+                if (userContent) {
+                    userContent.style.display = 'none';
+                }
+            }
+        }
+
+        // Search functionality
+        function performSearch(query = '', category = '', sort = 'relevance') {
+            if (!query && !category) {
+                searchResults.style.display = 'none';
+                return;
+            }
+
+            showNotification('Searching...', 'info');
+            
+            // Simulate API delay
+            setTimeout(() => {
+                let results = mockSearchData.filter(item => {
+                    const matchesQuery = !query || 
+                        item.title.toLowerCase().includes(query.toLowerCase()) ||
+                        item.description.toLowerCase().includes(query.toLowerCase());
+                    const matchesCategory = !category || item.category === category;
+                    return matchesQuery && matchesCategory;
+                });
+
+                // Sort results
+                switch (sort) {
+                    case 'date':
+                        results.sort((a, b) => new Date(b.date) - new Date(a.date));
+                        break;
+                    case 'popularity':
+                        results.sort((a, b) => b.popularity - a.popularity);
+                        break;
+                    case 'rating':
+                        results.sort((a, b) => b.rating - a.rating);
+                        break;
+                    default: // relevance
+                        results.sort((a, b) => b.popularity - a.popularity);
+                }
+
+                displaySearchResults(results, query);
+            }, 800);
+        }
+
+        function displaySearchResults(results, query) {
+            searchResults.style.display = 'block';
+            
+            if (results.length === 0) {
+                searchResults.innerHTML = `
+                    <div class="no-results" data-testid="no-results">
+                        <h3>No results found</h3>
+                        <p>Sorry, we couldn't find any results for "${query}". Try adjusting your search terms or filters.</p>
+                    </div>
+                `;
+                return;
+            }
+
+            const resultsHTML = `
+                <h3>Search Results (${results.length} found)</h3>
+                ${results.map((result, index) => `
+                    <div class="result-item" data-testid="search-result-${index}">
+                        <div class="result-title">${result.title}</div>
+                        <div class="result-description">${result.description}</div>
+                        <div class="result-meta">
+                            <span>Category: ${result.category}</span>
+                            <span>Date: ${result.date}</span>
+                            <span>Rating: ${result.rating}/5</span>
+                            <span>Popularity: ${result.popularity}%</span>
+                        </div>
+                    </div>
+                `).join('')}
+            `;
+            
+            searchResults.innerHTML = resultsHTML;
+            showNotification(`Found ${results.length} results`, 'success');
+        }
+
+        function applyFilters() {
+            const query = searchInput.value.trim();
+            const category = categoryFilter.value;
+            const sort = sortFilter.value;
+            
+            performSearch(query, category, sort);
+        }
+
+        // Mobile menu functionality
+        function toggleMobileMenu() {
+            mobileMenuToggle.classList.toggle('active');
+            navLinks.classList.toggle('active');
+        }
+
+        // Smooth scrolling for navigation
+        function smoothScrollTo(targetId) {
+            const target = document.getElementById(targetId);
+            if (target) {
+                target.scrollIntoView({
+                    behavior: 'smooth',
+                    block: 'start'
+                });
+            }
+        }
+
+        // Form handlers
+        function handleContactForm(e) {
+            e.preventDefault();
+            const formData = new FormData(e.target);
+            const name = formData.get('name');
+            const email = formData.get('email');
+            const message = formData.get('message');
+            
+            if (!name || !email || !message) {
+                showNotification('Please fill in all fields.', 'error');
+                return;
+            }
+            
+            // Simulate form submission
+            showNotification('Message sent successfully! We\'ll get back to you soon.', 'success');
+            e.target.reset();
+        }
+
+        function handleNewsletterForm(e) {
+            e.preventDefault();
+            const formData = new FormData(e.target);
+            const email = formData.get('email');
+            
+            if (!email) {
+                showNotification('Please enter your email address.', 'error');
+                return;
+            }
+            
+            if (!email.includes('@')) {
+                showNotification('Please enter a valid email address.', 'error');
+                return;
+            }
+            
+            // Simulate subscription
+            showNotification('Successfully subscribed to our newsletter!', 'success');
+            e.target.reset();
+        }
+
+        function showNotification(message, type = 'info') {
+            const notification = document.createElement('div');
+            notification.style.cssText = `
+                position: fixed;
+                top: 20px;
+                right: 20px;
+                padding: 15px 20px;
+                border-radius: 8px;
+                color: white;
+                font-weight: 500;
+                z-index: 1000;
+                animation: slideIn 0.3s ease;
+                max-width: 300px;
+            `;
+            
+            const colors = {
+                success: '#4CAF50',
+                error: '#f44336',
+                info: '#2196F3'
+            };
+            
+            notification.style.backgroundColor = colors[type] || colors.info;
+            notification.textContent = message;
+            notification.setAttribute('data-testid', 'notification');
+            
+            document.body.appendChild(notification);
+            
+            setTimeout(() => {
+                notification.style.animation = 'slideOut 0.3s ease';
+                setTimeout(() => {
+                    if (document.body.contains(notification)) {
+                        document.body.removeChild(notification);
+                    }
+                }, 300);
+            }, 3000);
+        }
+
+        // Event listeners
+        loginBtn.addEventListener('click', login);
+        signupBtn.addEventListener('click', signup);
+        logoutBtn.addEventListener('click', logout);
+        profileBtn.addEventListener('click', goToProfile);
+        
+        searchBtn.addEventListener('click', () => {
+            const query = searchInput.value.trim();
+            if (query) {
+                performSearch(query, categoryFilter.value, sortFilter.value);
+            } else {
+                showNotification('Please enter a search term.', 'error');
+            }
+        });
+        
+        searchInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                const query = searchInput.value.trim();
+                if (query) {
+                    performSearch(query, categoryFilter.value, sortFilter.value);
+                }
+            }
+        });
+        
+        applyFiltersBtn.addEventListener('click', applyFilters);
+        
+        if (contactForm) {
+            contactForm.addEventListener('submit', handleContactForm);
+        }
+        
+        if (newsletterForm) {
+            newsletterForm.addEventListener('submit', handleNewsletterForm);
+        }
+        
+        if (mobileMenuToggle) {
+            mobileMenuToggle.addEventListener('click', toggleMobileMenu);
+        }
+        
+        // Navigation link handlers
+        document.querySelectorAll('.nav-links a').forEach(link => {
+            link.addEventListener('click', (e) => {
+                e.preventDefault();
+                const targetId = link.getAttribute('href').substring(1);
+                smoothScrollTo(targetId);
+                
+                // Close mobile menu if open
+                if (navLinks.classList.contains('active')) {
+                    toggleMobileMenu();
+                }
+            });
+        });
+
+        // Close mobile menu when clicking outside
+        document.addEventListener('click', (e) => {
+            if (!e.target.closest('nav') && navLinks.classList.contains('active')) {
+                toggleMobileMenu();
+            }
+        });
+
+        // Add CSS animations
+        const style = document.createElement('style');
+        style.textContent = `
+            @keyframes slideIn {
+                from { transform: translateX(100%); opacity: 0; }
+                to { transform: translateX(0); opacity: 1; }
+            }
+            @keyframes slideOut {
+                from { transform: translateX(0); opacity: 1; }
+                to { transform: translateX(100%); opacity: 0; }
+            }
+        `;
+        document.head.appendChild(style);
+
+        // Initialize
+        updateAuthUI();
+        
+        // Check for login success from other pages
+        const urlParams = new URLSearchParams(window.location.search);
+        if (urlParams.get('login') === 'success') {
+            showNotification('Welcome back! You have successfully logged in.', 'success');
+            // Clean up URL
+            window.history.replaceState({}, document.title, window.location.pathname);
+        }
+    </script>
+</body>
+</html>

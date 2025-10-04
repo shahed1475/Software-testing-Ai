@@ -1,0 +1,365 @@
+name: Security Testing with OWASP ZAP
+
+on:
+  push:
+    branches: [ main, develop ]
+    paths:
+      - 'tests/security/**'
+      - 'src/security/**'
+      - '.github/workflows/test-security.yml'
+  pull_request:
+    branches: [ main, develop ]
+    paths:
+      - 'tests/security/**'
+      - 'src/security/**'
+      - '.github/workflows/test-security.yml'
+  workflow_dispatch:
+    inputs:
+      target_url:
+        description: 'Target URL to scan'
+        required: true
+        default: 'https://staging.example.com'
+      scan_type:
+        description: 'Type of security scan'
+        required: true
+        default: 'baseline'
+        type: choice
+        options:
+          - baseline
+          - full
+          - api
+          - ajax
+      max_duration:
+        description: 'Maximum scan duration (minutes)'
+        required: false
+        default: '10'
+
+env:
+  PYTHON_VERSION: '3.11'
+
+jobs:
+  security-baseline:
+    name: OWASP ZAP Baseline Scan
+    runs-on: ubuntu-latest
+    if: github.event.inputs.scan_type == 'baseline' || github.event.inputs.scan_type == '' || github.event_name != 'workflow_dispatch'
+    timeout-minutes: 30
+    
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_DB: testing_ai
+          POSTGRES_USER: testuser
+          POSTGRES_PASSWORD: testpass
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: 'pip'
+      
+      - name: Install dependencies
+        run: |
+          pip install -r requirements.txt
+      
+      - name: Setup test environment
+        run: |
+          cp .env.example .env
+          echo "DB_HOST=localhost" >> .env
+          echo "DB_PORT=5432" >> .env
+          echo "DB_NAME=testing_ai" >> .env
+          echo "DB_USER=testuser" >> .env
+          echo "DB_PASSWORD=testpass" >> .env
+          echo "ZAP_PROXY_URL=http://localhost:8080" >> .env
+          echo "TARGET_URL=${{ github.event.inputs.target_url || 'https://staging.example.com' }}" >> .env
+      
+      - name: Initialize database
+        run: |
+          python -c "from src.database import init_database; init_database()"
+      
+      - name: Create reports directory
+        run: mkdir -p reports/security
+      
+      - name: Run OWASP ZAP Baseline Scan
+        run: |
+          docker run -v $(pwd)/reports/security:/zap/wrk/:rw \
+            -t owasp/zap2docker-stable zap-baseline.py \
+            -t ${{ github.event.inputs.target_url || 'https://staging.example.com' }} \
+            -J zap-baseline-report.json \
+            -H zap-baseline-report.html \
+            -r zap-baseline-report.md \
+            -x zap-baseline-report.xml \
+            -m ${{ github.event.inputs.max_duration || '10' }} \
+            -z "-configfile /zap/wrk/zap.conf"
+      
+      - name: Upload security scan results to database
+        if: always()
+        run: |
+          python scripts/upload_security_results.py \
+            --type baseline \
+            --results-file reports/security/zap-baseline-report.json \
+            --target-url "${{ github.event.inputs.target_url || 'https://staging.example.com' }}" \
+            --branch ${{ github.ref_name }} \
+            --commit ${{ github.sha }} \
+            --triggered-by "github-actions"
+      
+      - name: Upload security reports
+        uses: actions/upload-artifact@v3
+        if: always()
+        with:
+          name: security-baseline-reports
+          path: |
+            reports/security/zap-baseline-report.*
+          retention-days: 30
+      
+      - name: Comment PR with security results
+        if: github.event_name == 'pull_request' && always()
+        uses: actions/github-script@v6
+        with:
+          script: |
+            const fs = require('fs');
+            
+            try {
+              const reportFile = 'reports/security/zap-baseline-report.json';
+              if (fs.existsSync(reportFile)) {
+                const report = JSON.parse(fs.readFileSync(reportFile, 'utf8'));
+                const site = report.site[0];
+                
+                let alertSummary = '';
+                if (site && site.alerts) {
+                  const alerts = site.alerts;
+                  const high = alerts.filter(a => a.riskdesc.includes('High')).length;
+                  const medium = alerts.filter(a => a.riskdesc.includes('Medium')).length;
+                  const low = alerts.filter(a => a.riskdesc.includes('Low')).length;
+                  const info = alerts.filter(a => a.riskdesc.includes('Informational')).length;
+                  
+                  alertSummary = `
+                | Risk Level | Count |
+                |------------|-------|
+                | 🔴 High | ${high} |
+                | 🟡 Medium | ${medium} |
+                | 🟢 Low | ${low} |
+                | ℹ️ Info | ${info} |
+                | **Total** | **${alerts.length}** |
+                  `;
+                }
+                
+                const comment = `## 🔒 Security Scan Results (Baseline)
+                
+                **Target:** ${{ github.event.inputs.target_url || 'https://staging.example.com' }}
+                
+                ${alertSummary}
+                
+                ${site && site.alerts && site.alerts.some(a => a.riskdesc.includes('High')) ? 
+                  '🚨 **High risk vulnerabilities found!** Please review the detailed report.' : 
+                  '✅ No high risk vulnerabilities detected.'}
+                `;
+                
+                github.rest.issues.createComment({
+                  issue_number: context.issue.number,
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  body: comment
+                });
+              }
+            } catch (error) {
+              console.log('Could not post security results comment:', error);
+            }
+
+  security-full:
+    name: OWASP ZAP Full Scan
+    runs-on: ubuntu-latest
+    if: github.event.inputs.scan_type == 'full'
+    timeout-minutes: 60
+    
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_DB: testing_ai
+          POSTGRES_USER: testuser
+          POSTGRES_PASSWORD: testpass
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: 'pip'
+      
+      - name: Install dependencies
+        run: |
+          pip install -r requirements.txt
+      
+      - name: Setup test environment
+        run: |
+          cp .env.example .env
+          echo "DB_HOST=localhost" >> .env
+          echo "DB_PORT=5432" >> .env
+          echo "DB_NAME=testing_ai" >> .env
+          echo "DB_USER=testuser" >> .env
+          echo "DB_PASSWORD=testpass" >> .env
+          echo "ZAP_PROXY_URL=http://localhost:8080" >> .env
+          echo "TARGET_URL=${{ github.event.inputs.target_url }}" >> .env
+      
+      - name: Initialize database
+        run: |
+          python -c "from src.database import init_database; init_database()"
+      
+      - name: Create reports directory
+        run: mkdir -p reports/security
+      
+      - name: Run OWASP ZAP Full Scan
+        run: |
+          docker run -v $(pwd)/reports/security:/zap/wrk/:rw \
+            -t owasp/zap2docker-stable zap-full-scan.py \
+            -t ${{ github.event.inputs.target_url }} \
+            -J zap-full-report.json \
+            -H zap-full-report.html \
+            -r zap-full-report.md \
+            -x zap-full-report.xml \
+            -m ${{ github.event.inputs.max_duration || '30' }}
+      
+      - name: Upload security scan results to database
+        if: always()
+        run: |
+          python scripts/upload_security_results.py \
+            --type full \
+            --results-file reports/security/zap-full-report.json \
+            --target-url "${{ github.event.inputs.target_url }}" \
+            --branch ${{ github.ref_name }} \
+            --commit ${{ github.sha }} \
+            --triggered-by "github-actions"
+      
+      - name: Upload security reports
+        uses: actions/upload-artifact@v3
+        if: always()
+        with:
+          name: security-full-reports
+          path: |
+            reports/security/zap-full-report.*
+          retention-days: 30
+
+  security-api:
+    name: OWASP ZAP API Scan
+    runs-on: ubuntu-latest
+    if: github.event.inputs.scan_type == 'api'
+    timeout-minutes: 30
+    
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_DB: testing_ai
+          POSTGRES_USER: testuser
+          POSTGRES_PASSWORD: testpass
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: 'pip'
+      
+      - name: Install dependencies
+        run: |
+          pip install -r requirements.txt
+      
+      - name: Setup test environment
+        run: |
+          cp .env.example .env
+          echo "DB_HOST=localhost" >> .env
+          echo "DB_PORT=5432" >> .env
+          echo "DB_NAME=testing_ai" >> .env
+          echo "DB_USER=testuser" >> .env
+          echo "DB_PASSWORD=testpass" >> .env
+          echo "ZAP_PROXY_URL=http://localhost:8080" >> .env
+          echo "TARGET_URL=${{ github.event.inputs.target_url }}" >> .env
+      
+      - name: Initialize database
+        run: |
+          python -c "from src.database import init_database; init_database()"
+      
+      - name: Create reports directory
+        run: mkdir -p reports/security
+      
+      - name: Run OWASP ZAP API Scan
+        run: |
+          docker run -v $(pwd)/reports/security:/zap/wrk/:rw \
+            -t owasp/zap2docker-stable zap-api-scan.py \
+            -t ${{ github.event.inputs.target_url }}/openapi.json \
+            -f openapi \
+            -J zap-api-report.json \
+            -H zap-api-report.html \
+            -r zap-api-report.md \
+            -x zap-api-report.xml
+      
+      - name: Upload security scan results to database
+        if: always()
+        run: |
+          python scripts/upload_security_results.py \
+            --type api \
+            --results-file reports/security/zap-api-report.json \
+            --target-url "${{ github.event.inputs.target_url }}" \
+            --branch ${{ github.ref_name }} \
+            --commit ${{ github.sha }} \
+            --triggered-by "github-actions"
+      
+      - name: Upload security reports
+        uses: actions/upload-artifact@v3
+        if: always()
+        with:
+          name: security-api-reports
+          path: |
+            reports/security/zap-api-report.*
+          retention-days: 30
+
+  publish-security-results:
+    name: Publish Security Results
+    runs-on: ubuntu-latest
+    needs: [security-baseline, security-full, security-api]
+    if: always()
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Download all artifacts
+        uses: actions/download-artifact@v3
+      
+      - name: Generate consolidated security report
+        run: |
+          echo "Generating consolidated security report..."
+          # This would call a script to generate a consolidated security report
+          # python scripts/generate_security_report.py --output-dir reports/

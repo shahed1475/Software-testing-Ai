@@ -1,0 +1,243 @@
+name: API Testing with Pytest
+
+on:
+  push:
+    branches: [ main, develop ]
+    paths:
+      - 'tests/api/**'
+      - 'src/api/**'
+      - 'pytest.ini'
+      - '.github/workflows/test-api.yml'
+  pull_request:
+    branches: [ main, develop ]
+    paths:
+      - 'tests/api/**'
+      - 'src/api/**'
+      - 'pytest.ini'
+      - '.github/workflows/test-api.yml'
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment to test against'
+        required: true
+        default: 'staging'
+        type: choice
+        options:
+          - staging
+          - production
+      test_suite:
+        description: 'Test suite to run'
+        required: true
+        default: 'all'
+        type: choice
+        options:
+          - all
+          - auth
+          - crud
+          - integration
+
+env:
+  PYTHON_VERSION: '3.11'
+
+jobs:
+  api-tests:
+    name: Pytest API Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_DB: testing_ai
+          POSTGRES_USER: testuser
+          POSTGRES_PASSWORD: testpass
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+      
+      redis:
+        image: redis:7-alpine
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 6379:6379
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: 'pip'
+      
+      - name: Install dependencies
+        run: |
+          pip install -r requirements.txt
+          pip install pytest-xdist pytest-html pytest-json-report pytest-cov
+      
+      - name: Setup test environment
+        run: |
+          cp .env.example .env
+          echo "DB_HOST=localhost" >> .env
+          echo "DB_PORT=5432" >> .env
+          echo "DB_NAME=testing_ai" >> .env
+          echo "DB_USER=testuser" >> .env
+          echo "DB_PASSWORD=testpass" >> .env
+          echo "REDIS_URL=redis://localhost:6379" >> .env
+          echo "TEST_ENVIRONMENT=${{ github.event.inputs.environment || 'staging' }}" >> .env
+          echo "API_BASE_URL=https://api.${{ github.event.inputs.environment || 'staging' }}.example.com" >> .env
+      
+      - name: Initialize database
+        run: |
+          python -c "from src.database import init_database; init_database()"
+      
+      - name: Lint with flake8
+        run: |
+          pip install flake8
+          flake8 tests/api --count --select=E9,F63,F7,F82 --show-source --statistics
+          flake8 tests/api --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
+      
+      - name: Run API tests
+        run: |
+          pytest tests/api \
+            --verbose \
+            --tb=short \
+            --html=reports/api-test-report.html \
+            --self-contained-html \
+            --json-report --json-report-file=reports/api-test-results.json \
+            --junit-xml=reports/api-test-results.xml \
+            --cov=src \
+            --cov-report=html:reports/coverage \
+            --cov-report=xml:reports/coverage.xml \
+            --cov-report=term-missing \
+            -n auto \
+            ${{ github.event.inputs.test_suite != 'all' && format('-m {0}', github.event.inputs.test_suite) || '' }}
+        env:
+          CI: true
+          PYTEST_CURRENT_TEST: true
+      
+      - name: Upload test results to database
+        if: always()
+        run: |
+          python scripts/upload_test_results.py \
+            --type api \
+            --results-file reports/api-test-results.json \
+            --environment ${{ github.event.inputs.environment || 'staging' }} \
+            --branch ${{ github.ref_name }} \
+            --commit ${{ github.sha }} \
+            --triggered-by "github-actions"
+      
+      - name: Upload test reports
+        uses: actions/upload-artifact@v3
+        if: always()
+        with:
+          name: api-test-reports
+          path: |
+            reports/
+          retention-days: 30
+      
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v3
+        if: always()
+        with:
+          file: reports/coverage.xml
+          flags: api-tests
+          name: api-coverage
+          fail_ci_if_error: false
+      
+      - name: Comment PR with test results
+        if: github.event_name == 'pull_request' && always()
+        uses: actions/github-script@v6
+        with:
+          script: |
+            const fs = require('fs');
+            
+            try {
+              const resultsFile = 'reports/api-test-results.json';
+              if (fs.existsSync(resultsFile)) {
+                const results = JSON.parse(fs.readFileSync(resultsFile, 'utf8'));
+                const { summary } = results;
+                
+                const comment = `## 🧪 API Test Results
+                
+                | Metric | Value |
+                |--------|-------|
+                | Total Tests | ${summary.total} |
+                | ✅ Passed | ${summary.passed} |
+                | ❌ Failed | ${summary.failed} |
+                | ⏭️ Skipped | ${summary.skipped} |
+                | ❗ Errors | ${summary.error} |
+                | ⏱️ Duration | ${summary.duration.toFixed(2)}s |
+                | 📊 Success Rate | ${((summary.passed / summary.total) * 100).toFixed(1)}% |
+                
+                ${summary.failed > 0 || summary.error > 0 ? '❌ Some tests failed. Check the artifacts for details.' : '✅ All tests passed!'}
+                `;
+                
+                github.rest.issues.createComment({
+                  issue_number: context.issue.number,
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  body: comment
+                });
+              }
+            } catch (error) {
+              console.log('Could not post test results comment:', error);
+            }
+      
+      - name: Publish test results
+        uses: dorny/test-reporter@v1
+        if: always()
+        with:
+          name: API Tests
+          path: reports/api-test-results.xml
+          reporter: java-junit
+          fail-on-error: false
+
+  security-scan:
+    name: API Security Scan
+    runs-on: ubuntu-latest
+    needs: api-tests
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: 'pip'
+      
+      - name: Install dependencies
+        run: |
+          pip install -r requirements.txt
+      
+      - name: Run OWASP ZAP API scan
+        run: |
+          docker run -v $(pwd):/zap/wrk/:rw \
+            -t owasp/zap2docker-stable zap-api-scan.py \
+            -t https://api.${{ github.event.inputs.environment || 'staging' }}.example.com/openapi.json \
+            -f openapi \
+            -J zap-api-report.json \
+            -H zap-api-report.html \
+            -r zap-api-report.md
+      
+      - name: Upload security scan results
+        uses: actions/upload-artifact@v3
+        if: always()
+        with:
+          name: security-scan-results
+          path: |
+            zap-api-report.*
+          retention-days: 30

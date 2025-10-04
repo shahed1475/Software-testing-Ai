@@ -1,0 +1,233 @@
+name: Web Testing with Playwright
+
+on:
+  push:
+    branches: [ main, develop ]
+    paths:
+      - 'tests/web/**'
+      - 'src/web/**'
+      - 'playwright.config.ts'
+      - '.github/workflows/test-web.yml'
+  pull_request:
+    branches: [ main, develop ]
+    paths:
+      - 'tests/web/**'
+      - 'src/web/**'
+      - 'playwright.config.ts'
+      - '.github/workflows/test-web.yml'
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment to test against'
+        required: true
+        default: 'staging'
+        type: choice
+        options:
+          - staging
+          - production
+      browser:
+        description: 'Browser to test with'
+        required: true
+        default: 'chromium'
+        type: choice
+        options:
+          - chromium
+          - firefox
+          - webkit
+          - all
+
+env:
+  NODE_VERSION: '18'
+  PLAYWRIGHT_BROWSERS_PATH: ${{ github.workspace }}/ms-playwright
+
+jobs:
+  web-tests:
+    name: Playwright Web Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    
+    strategy:
+      fail-fast: false
+      matrix:
+        browser: ${{ github.event.inputs.browser == 'all' && fromJSON('["chromium", "firefox", "webkit"]') || fromJSON(format('["{0}"]', github.event.inputs.browser || 'chromium')) }}
+    
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_DB: testing_ai
+          POSTGRES_USER: testuser
+          POSTGRES_PASSWORD: testpass
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+      
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+      
+      - name: Install Python dependencies
+        run: |
+          pip install -r requirements.txt
+      
+      - name: Install Node.js dependencies
+        run: npm ci
+      
+      - name: Cache Playwright browsers
+        uses: actions/cache@v3
+        with:
+          path: ${{ env.PLAYWRIGHT_BROWSERS_PATH }}
+          key: ${{ runner.os }}-playwright-${{ hashFiles('package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-playwright-
+      
+      - name: Install Playwright browsers
+        run: npx playwright install ${{ matrix.browser }} --with-deps
+      
+      - name: Setup test environment
+        run: |
+          cp .env.example .env
+          echo "DB_HOST=localhost" >> .env
+          echo "DB_PORT=5432" >> .env
+          echo "DB_NAME=testing_ai" >> .env
+          echo "DB_USER=testuser" >> .env
+          echo "DB_PASSWORD=testpass" >> .env
+          echo "TEST_ENVIRONMENT=${{ github.event.inputs.environment || 'staging' }}" >> .env
+      
+      - name: Initialize database
+        run: |
+          python -c "from src.database import init_database; init_database()"
+      
+      - name: Run Playwright tests
+        run: |
+          npx playwright test --project=${{ matrix.browser }} --reporter=html,json,junit
+        env:
+          CI: true
+          PLAYWRIGHT_HTML_REPORT: playwright-report-${{ matrix.browser }}
+          PLAYWRIGHT_JSON_OUTPUT_NAME: test-results-${{ matrix.browser }}.json
+          PLAYWRIGHT_JUNIT_OUTPUT_NAME: test-results-${{ matrix.browser }}.xml
+      
+      - name: Upload test results to database
+        if: always()
+        run: |
+          python scripts/upload_test_results.py \
+            --type web \
+            --browser ${{ matrix.browser }} \
+            --results-file test-results-${{ matrix.browser }}.json \
+            --environment ${{ github.event.inputs.environment || 'staging' }} \
+            --branch ${{ github.ref_name }} \
+            --commit ${{ github.sha }} \
+            --triggered-by "github-actions"
+      
+      - name: Upload Playwright report
+        uses: actions/upload-artifact@v3
+        if: always()
+        with:
+          name: playwright-report-${{ matrix.browser }}
+          path: playwright-report-${{ matrix.browser }}/
+          retention-days: 30
+      
+      - name: Upload test results
+        uses: actions/upload-artifact@v3
+        if: always()
+        with:
+          name: test-results-${{ matrix.browser }}
+          path: |
+            test-results-${{ matrix.browser }}.json
+            test-results-${{ matrix.browser }}.xml
+            test-results/
+          retention-days: 30
+      
+      - name: Upload screenshots and videos
+        uses: actions/upload-artifact@v3
+        if: failure()
+        with:
+          name: playwright-artifacts-${{ matrix.browser }}
+          path: |
+            test-results/
+            screenshots/
+            videos/
+          retention-days: 30
+      
+      - name: Comment PR with test results
+        if: github.event_name == 'pull_request' && always()
+        uses: actions/github-script@v6
+        with:
+          script: |
+            const fs = require('fs');
+            const path = require('path');
+            
+            try {
+              const resultsFile = `test-results-${{ matrix.browser }}.json`;
+              if (fs.existsSync(resultsFile)) {
+                const results = JSON.parse(fs.readFileSync(resultsFile, 'utf8'));
+                const { stats } = results;
+                
+                const comment = `## 🎭 Playwright Test Results (${{ matrix.browser }})
+                
+                | Metric | Value |
+                |--------|-------|
+                | Total Tests | ${stats.expected + stats.unexpected + stats.skipped} |
+                | ✅ Passed | ${stats.expected} |
+                | ❌ Failed | ${stats.unexpected} |
+                | ⏭️ Skipped | ${stats.skipped} |
+                | ⏱️ Duration | ${(stats.duration / 1000).toFixed(2)}s |
+                | 📊 Success Rate | ${((stats.expected / (stats.expected + stats.unexpected)) * 100).toFixed(1)}% |
+                
+                ${stats.unexpected > 0 ? '❌ Some tests failed. Check the artifacts for details.' : '✅ All tests passed!'}
+                `;
+                
+                github.rest.issues.createComment({
+                  issue_number: context.issue.number,
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  body: comment
+                });
+              }
+            } catch (error) {
+              console.log('Could not post test results comment:', error);
+            }
+
+  publish-results:
+    name: Publish Test Results
+    runs-on: ubuntu-latest
+    needs: web-tests
+    if: always()
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Download all artifacts
+        uses: actions/download-artifact@v3
+      
+      - name: Publish test results
+        uses: dorny/test-reporter@v1
+        if: always()
+        with:
+          name: Playwright Web Tests
+          path: '**/test-results-*.xml'
+          reporter: java-junit
+          fail-on-error: false
+      
+      - name: Generate consolidated report
+        run: |
+          echo "Generating consolidated test report..."
+          # This would call a script to generate a consolidated HTML/PDF report
+          # python scripts/generate_report.py --type web --output-dir reports/

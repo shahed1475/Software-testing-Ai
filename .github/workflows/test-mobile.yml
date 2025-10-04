@@ -1,0 +1,334 @@
+name: Mobile Testing with Appium
+
+on:
+  push:
+    branches: [ main, develop ]
+    paths:
+      - 'tests/mobile/**'
+      - 'src/mobile/**'
+      - '.github/workflows/test-mobile.yml'
+  pull_request:
+    branches: [ main, develop ]
+    paths:
+      - 'tests/mobile/**'
+      - 'src/mobile/**'
+      - '.github/workflows/test-mobile.yml'
+  workflow_dispatch:
+    inputs:
+      platform:
+        description: 'Platform to test'
+        required: true
+        default: 'android'
+        type: choice
+        options:
+          - android
+          - ios
+          - both
+      device_type:
+        description: 'Device type'
+        required: true
+        default: 'emulator'
+        type: choice
+        options:
+          - emulator
+          - simulator
+          - real_device
+
+env:
+  PYTHON_VERSION: '3.11'
+  NODE_VERSION: '18'
+  JAVA_VERSION: '11'
+
+jobs:
+  android-tests:
+    name: Android Tests
+    runs-on: ubuntu-latest
+    if: github.event.inputs.platform == 'android' || github.event.inputs.platform == 'both' || github.event.inputs.platform == ''
+    timeout-minutes: 45
+    
+    strategy:
+      fail-fast: false
+      matrix:
+        api-level: [28, 30, 33]
+    
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_DB: testing_ai
+          POSTGRES_USER: testuser
+          POSTGRES_PASSWORD: testpass
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: 'pip'
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+      
+      - name: Setup Java
+        uses: actions/setup-java@v3
+        with:
+          distribution: 'temurin'
+          java-version: ${{ env.JAVA_VERSION }}
+      
+      - name: Install dependencies
+        run: |
+          pip install -r requirements.txt
+          npm install -g appium@next
+          appium driver install uiautomator2
+      
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+      
+      - name: Enable KVM group perms
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+      
+      - name: Create AVD and generate snapshot for caching
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: ${{ matrix.api-level }}
+          target: google_apis
+          arch: x86_64
+          profile: Nexus 6
+          cores: 2
+          ram-size: 4096M
+          heap-size: 1024M
+          sdcard-path-or-size: 1024M
+          avd-name: test_avd_${{ matrix.api-level }}
+          force-avd-creation: false
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
+          disable-animations: true
+          script: echo "Generated AVD snapshot for caching."
+      
+      - name: Setup test environment
+        run: |
+          cp .env.example .env
+          echo "DB_HOST=localhost" >> .env
+          echo "DB_PORT=5432" >> .env
+          echo "DB_NAME=testing_ai" >> .env
+          echo "DB_USER=testuser" >> .env
+          echo "DB_PASSWORD=testpass" >> .env
+          echo "APPIUM_SERVER_URL=http://localhost:4723" >> .env
+          echo "ANDROID_PLATFORM_VERSION=${{ matrix.api-level }}" >> .env
+          echo "ANDROID_DEVICE_NAME=test_avd_${{ matrix.api-level }}" >> .env
+      
+      - name: Initialize database
+        run: |
+          python -c "from src.database import init_database; init_database()"
+      
+      - name: Start Appium server
+        run: |
+          appium server --port 4723 --log-level info &
+          sleep 5
+      
+      - name: Run Android tests
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: ${{ matrix.api-level }}
+          target: google_apis
+          arch: x86_64
+          profile: Nexus 6
+          cores: 2
+          ram-size: 4096M
+          heap-size: 1024M
+          sdcard-path-or-size: 1024M
+          avd-name: test_avd_${{ matrix.api-level }}
+          force-avd-creation: false
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
+          disable-animations: true
+          script: |
+            pytest tests/mobile \
+              --verbose \
+              --tb=short \
+              --html=reports/mobile-android-${{ matrix.api-level }}-report.html \
+              --self-contained-html \
+              --json-report --json-report-file=reports/mobile-android-${{ matrix.api-level }}-results.json \
+              --junit-xml=reports/mobile-android-${{ matrix.api-level }}-results.xml \
+              --platform android \
+              --device-type emulator
+      
+      - name: Upload test results to database
+        if: always()
+        run: |
+          python scripts/upload_test_results.py \
+            --type mobile \
+            --platform android \
+            --device-version ${{ matrix.api-level }} \
+            --results-file reports/mobile-android-${{ matrix.api-level }}-results.json \
+            --environment testing \
+            --branch ${{ github.ref_name }} \
+            --commit ${{ github.sha }} \
+            --triggered-by "github-actions"
+      
+      - name: Upload test reports
+        uses: actions/upload-artifact@v3
+        if: always()
+        with:
+          name: mobile-android-${{ matrix.api-level }}-reports
+          path: |
+            reports/mobile-android-${{ matrix.api-level }}-*
+            screenshots/
+            videos/
+          retention-days: 30
+
+  ios-tests:
+    name: iOS Tests
+    runs-on: macos-latest
+    if: github.event.inputs.platform == 'ios' || github.event.inputs.platform == 'both'
+    timeout-minutes: 45
+    
+    strategy:
+      fail-fast: false
+      matrix:
+        ios-version: ['16.4', '17.0']
+        device: ['iPhone 14', 'iPhone 15']
+    
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_DB: testing_ai
+          POSTGRES_USER: testuser
+          POSTGRES_PASSWORD: testpass
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: 'pip'
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+      
+      - name: Install dependencies
+        run: |
+          pip install -r requirements.txt
+          npm install -g appium@next
+          appium driver install xcuitest
+      
+      - name: Setup iOS Simulator
+        run: |
+          xcrun simctl list devices available
+          DEVICE_UDID=$(xcrun simctl create "TestDevice" "com.apple.CoreSimulator.SimDeviceType.${{ matrix.device }}" "com.apple.CoreSimulator.SimRuntime.iOS-${{ matrix.ios-version }}")
+          echo "DEVICE_UDID=$DEVICE_UDID" >> $GITHUB_ENV
+          xcrun simctl boot $DEVICE_UDID
+      
+      - name: Setup test environment
+        run: |
+          cp .env.example .env
+          echo "DB_HOST=localhost" >> .env
+          echo "DB_PORT=5432" >> .env
+          echo "DB_NAME=testing_ai" >> .env
+          echo "DB_USER=testuser" >> .env
+          echo "DB_PASSWORD=testpass" >> .env
+          echo "APPIUM_SERVER_URL=http://localhost:4723" >> .env
+          echo "IOS_PLATFORM_VERSION=${{ matrix.ios-version }}" >> .env
+          echo "IOS_DEVICE_NAME=${{ matrix.device }}" >> .env
+          echo "IOS_DEVICE_UDID=${{ env.DEVICE_UDID }}" >> .env
+      
+      - name: Initialize database
+        run: |
+          python -c "from src.database import init_database; init_database()"
+      
+      - name: Start Appium server
+        run: |
+          appium server --port 4723 --log-level info &
+          sleep 5
+      
+      - name: Run iOS tests
+        run: |
+          pytest tests/mobile \
+            --verbose \
+            --tb=short \
+            --html=reports/mobile-ios-${{ matrix.ios-version }}-report.html \
+            --self-contained-html \
+            --json-report --json-report-file=reports/mobile-ios-${{ matrix.ios-version }}-results.json \
+            --junit-xml=reports/mobile-ios-${{ matrix.ios-version }}-results.xml \
+            --platform ios \
+            --device-type simulator
+      
+      - name: Upload test results to database
+        if: always()
+        run: |
+          python scripts/upload_test_results.py \
+            --type mobile \
+            --platform ios \
+            --device-version ${{ matrix.ios-version }} \
+            --results-file reports/mobile-ios-${{ matrix.ios-version }}-results.json \
+            --environment testing \
+            --branch ${{ github.ref_name }} \
+            --commit ${{ github.sha }} \
+            --triggered-by "github-actions"
+      
+      - name: Upload test reports
+        uses: actions/upload-artifact@v3
+        if: always()
+        with:
+          name: mobile-ios-${{ matrix.ios-version }}-reports
+          path: |
+            reports/mobile-ios-${{ matrix.ios-version }}-*
+            screenshots/
+            videos/
+          retention-days: 30
+      
+      - name: Cleanup iOS Simulator
+        if: always()
+        run: |
+          xcrun simctl shutdown ${{ env.DEVICE_UDID }}
+          xcrun simctl delete ${{ env.DEVICE_UDID }}
+
+  publish-results:
+    name: Publish Mobile Test Results
+    runs-on: ubuntu-latest
+    needs: [android-tests, ios-tests]
+    if: always()
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Download all artifacts
+        uses: actions/download-artifact@v3
+      
+      - name: Publish test results
+        uses: dorny/test-reporter@v1
+        if: always()
+        with:
+          name: Mobile Tests
+          path: '**/mobile-*-results.xml'
+          reporter: java-junit
+          fail-on-error: false

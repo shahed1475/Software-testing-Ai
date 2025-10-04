@@ -1,0 +1,472 @@
+name: Nightly Test Suite
+
+on:
+  schedule:
+    # Run every night at 1 AM UTC
+    - cron: '0 1 * * *'
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment to test'
+        required: false
+        default: 'staging'
+        type: choice
+        options:
+          - staging
+          - production
+      include_performance:
+        description: 'Include performance tests'
+        required: false
+        default: true
+        type: boolean
+      include_security:
+        description: 'Include security tests'
+        required: false
+        default: true
+        type: boolean
+
+jobs:
+  # Full regression test suite
+  regression-tests:
+    timeout-minutes: 120
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+        browser: [chromium, firefox, webkit]
+        exclude:
+          - os: windows-latest
+            browser: webkit
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+        cache: 'npm'
+
+    - name: Install dependencies
+      run: npm ci
+
+    - name: Install Playwright Browsers
+      run: npx playwright install --with-deps
+
+    - name: Run regression tests
+      env:
+        CI: true
+        BROWSER: ${{ matrix.browser }}
+        TEST_ENVIRONMENT: ${{ github.event.inputs.environment || 'staging' }}
+        BASE_URL: ${{ secrets.BASE_URL }}
+        API_BASE_URL: ${{ secrets.API_BASE_URL }}
+        TEST_USERNAME: ${{ secrets.TEST_USERNAME }}
+        TEST_PASSWORD: ${{ secrets.TEST_PASSWORD }}
+        ADMIN_USERNAME: ${{ secrets.ADMIN_USERNAME }}
+        ADMIN_PASSWORD: ${{ secrets.ADMIN_PASSWORD }}
+        FULLY_PARALLEL: true
+        WORKERS: 4
+        RETRIES: 2
+      run: npm run test:regression -- --project=${{ matrix.browser }}
+
+    - name: Upload test results
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: regression-results-${{ matrix.os }}-${{ matrix.browser }}
+        path: |
+          reports/
+          test-results/
+          allure-results/
+        retention-days: 7
+
+  # API test suite
+  api-tests:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+        cache: 'npm'
+
+    - name: Install dependencies
+      run: npm ci
+
+    - name: Run API tests
+      env:
+        CI: true
+        TEST_ENVIRONMENT: ${{ github.event.inputs.environment || 'staging' }}
+        API_BASE_URL: ${{ secrets.API_BASE_URL }}
+        API_TIMEOUT: 15000
+        API_RETRIES: 3
+      run: npm run test:api
+
+    - name: Upload API test results
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: api-test-results
+        path: |
+          reports/
+          test-results/
+        retention-days: 7
+
+  # Mobile test suite
+  mobile-tests:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        device: ['iPhone 12', 'Pixel 5']
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+        cache: 'npm'
+
+    - name: Install dependencies
+      run: npm ci
+
+    - name: Install Playwright Browsers
+      run: npx playwright install --with-deps
+
+    - name: Run mobile tests
+      env:
+        CI: true
+        TEST_ENVIRONMENT: ${{ github.event.inputs.environment || 'staging' }}
+        BASE_URL: ${{ secrets.BASE_URL }}
+        DEVICE_NAME: ${{ matrix.device }}
+        MOBILE_TESTING_ENABLED: true
+      run: npm run test:mobile
+
+    - name: Upload mobile test results
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: mobile-results-${{ matrix.device }}
+        path: |
+          reports/
+          test-results/
+        retention-days: 7
+
+  # Performance test suite
+  performance-tests:
+    runs-on: ubuntu-latest
+    if: github.event.inputs.include_performance != 'false'
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+        cache: 'npm'
+
+    - name: Install dependencies
+      run: npm ci
+
+    - name: Install Playwright Browsers
+      run: npx playwright install --with-deps chromium
+
+    - name: Run performance tests
+      env:
+        CI: true
+        BROWSER: chromium
+        TEST_ENVIRONMENT: ${{ github.event.inputs.environment || 'staging' }}
+        BASE_URL: ${{ secrets.BASE_URL }}
+        PERFORMANCE_TESTING_ENABLED: true
+        PERFORMANCE_THRESHOLD_MS: 3000
+      run: npm run test:performance
+
+    - name: Analyze performance results
+      run: |
+        echo "## Performance Test Results" >> $GITHUB_STEP_SUMMARY
+        if [ -f "reports/performance-results.json" ]; then
+          node -e "
+            const fs = require('fs');
+            const results = JSON.parse(fs.readFileSync('reports/performance-results.json', 'utf8'));
+            console.log('| Metric | Value | Threshold | Status |');
+            console.log('|--------|-------|-----------|--------|');
+            Object.entries(results).forEach(([key, value]) => {
+              const threshold = 3000;
+              const status = value <= threshold ? '✅ Pass' : '❌ Fail';
+              console.log(\`| \${key} | \${value}ms | \${threshold}ms | \${status} |\`);
+            });
+          " >> $GITHUB_STEP_SUMMARY
+        fi
+
+    - name: Upload performance results
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: performance-test-results
+        path: |
+          reports/
+          test-results/
+        retention-days: 30
+
+  # Security test suite
+  security-tests:
+    runs-on: ubuntu-latest
+    if: github.event.inputs.include_security != 'false'
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+        cache: 'npm'
+
+    - name: Install dependencies
+      run: npm ci
+
+    - name: Install Playwright Browsers
+      run: npx playwright install --with-deps chromium
+
+    - name: Start OWASP ZAP
+      run: |
+        docker run -d --name zap-proxy -p 8080:8080 \
+          -v $(pwd):/zap/wrk/:rw \
+          owasp/zap2docker-stable zap.sh -daemon -host 0.0.0.0 -port 8080 \
+          -config api.addrs.addr.name=.* -config api.addrs.addr.regex=true
+
+    - name: Wait for ZAP to start
+      run: |
+        timeout 60 bash -c 'until curl -s http://localhost:8080 > /dev/null; do sleep 1; done'
+
+    - name: Run security tests
+      env:
+        CI: true
+        BROWSER: chromium
+        TEST_ENVIRONMENT: ${{ github.event.inputs.environment || 'staging' }}
+        BASE_URL: ${{ secrets.BASE_URL }}
+        SECURITY_TESTING_ENABLED: true
+        ZAP_PROXY_HOST: localhost
+        ZAP_PROXY_PORT: 8080
+      run: npm run test:security
+
+    - name: Generate ZAP report
+      run: |
+        curl "http://localhost:8080/JSON/core/action/newSession/?name=nightly-scan"
+        curl "http://localhost:8080/JSON/reports/action/generate/?title=Nightly%20Security%20Scan&template=traditional-html&reportDir=/zap/wrk/reports&reportFileName=security-report.html"
+
+    - name: Stop ZAP
+      run: docker stop zap-proxy
+
+    - name: Upload security results
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: security-test-results
+        path: |
+          reports/
+          test-results/
+        retention-days: 30
+
+  # Cross-browser compatibility tests
+  compatibility-tests:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        browser: [chromium, firefox, webkit]
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+        cache: 'npm'
+
+    - name: Install dependencies
+      run: npm ci
+
+    - name: Install Playwright Browsers
+      run: npx playwright install --with-deps ${{ matrix.browser }}
+
+    - name: Run compatibility tests
+      env:
+        CI: true
+        BROWSER: ${{ matrix.browser }}
+        TEST_ENVIRONMENT: ${{ github.event.inputs.environment || 'staging' }}
+        BASE_URL: ${{ secrets.BASE_URL }}
+      run: npm run test:compatibility -- --project=${{ matrix.browser }}
+
+    - name: Upload compatibility results
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: compatibility-results-${{ matrix.browser }}
+        path: |
+          reports/
+          test-results/
+        retention-days: 7
+
+  # Generate comprehensive report
+  generate-report:
+    runs-on: ubuntu-latest
+    needs: [regression-tests, api-tests, mobile-tests, performance-tests, security-tests, compatibility-tests]
+    if: always()
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Download all test results
+      uses: actions/download-artifact@v4
+      with:
+        path: all-results
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+        cache: 'npm'
+
+    - name: Install dependencies
+      run: npm ci
+
+    - name: Generate consolidated report
+      run: |
+        mkdir -p consolidated-reports
+        node -e "
+          const fs = require('fs');
+          const path = require('path');
+          
+          const resultsDir = 'all-results';
+          const reportData = {
+            timestamp: new Date().toISOString(),
+            environment: process.env.GITHUB_EVENT_INPUTS_ENVIRONMENT || 'staging',
+            results: {}
+          };
+          
+          // Process all result directories
+          const resultDirs = fs.readdirSync(resultsDir);
+          resultDirs.forEach(dir => {
+            const dirPath = path.join(resultsDir, dir);
+            if (fs.statSync(dirPath).isDirectory()) {
+              const reportFile = path.join(dirPath, 'reports', 'test-results.json');
+              if (fs.existsSync(reportFile)) {
+                try {
+                  const data = JSON.parse(fs.readFileSync(reportFile, 'utf8'));
+                  reportData.results[dir] = data;
+                } catch (e) {
+                  console.log(\`Failed to parse \${reportFile}: \${e.message}\`);
+                }
+              }
+            }
+          });
+          
+          fs.writeFileSync('consolidated-reports/nightly-report.json', JSON.stringify(reportData, null, 2));
+          console.log('Consolidated report generated');
+        "
+
+    - name: Upload consolidated report
+      uses: actions/upload-artifact@v4
+      with:
+        name: nightly-consolidated-report
+        path: consolidated-reports/
+        retention-days: 30
+
+  # Send notifications
+  notify:
+    runs-on: ubuntu-latest
+    needs: [regression-tests, api-tests, mobile-tests, performance-tests, security-tests, compatibility-tests]
+    if: always()
+    steps:
+    - name: Calculate test results
+      id: results
+      run: |
+        regression_result="${{ needs.regression-tests.result }}"
+        api_result="${{ needs.api-tests.result }}"
+        mobile_result="${{ needs.mobile-tests.result }}"
+        performance_result="${{ needs.performance-tests.result }}"
+        security_result="${{ needs.security-tests.result }}"
+        compatibility_result="${{ needs.compatibility-tests.result }}"
+        
+        overall_status="success"
+        if [[ "$regression_result" == "failure" || "$api_result" == "failure" || "$mobile_result" == "failure" || "$performance_result" == "failure" || "$security_result" == "failure" || "$compatibility_result" == "failure" ]]; then
+          overall_status="failure"
+        fi
+        
+        echo "overall_status=$overall_status" >> $GITHUB_OUTPUT
+        echo "regression_result=$regression_result" >> $GITHUB_OUTPUT
+        echo "api_result=$api_result" >> $GITHUB_OUTPUT
+        echo "mobile_result=$mobile_result" >> $GITHUB_OUTPUT
+        echo "performance_result=$performance_result" >> $GITHUB_OUTPUT
+        echo "security_result=$security_result" >> $GITHUB_OUTPUT
+        echo "compatibility_result=$compatibility_result" >> $GITHUB_OUTPUT
+
+    - name: Send Slack notification
+      if: always()
+      env:
+        SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+      run: |
+        if [ -n "$SLACK_WEBHOOK_URL" ]; then
+          status_emoji="${{ steps.results.outputs.overall_status == 'success' && '✅' || '❌' }}"
+          
+          payload=$(cat <<EOF
+        {
+          "text": "🌙 Nightly Test Suite Results",
+          "blocks": [
+            {
+              "type": "header",
+              "text": {
+                "type": "plain_text",
+                "text": "🌙 Nightly Test Suite Results"
+              }
+            },
+            {
+              "type": "section",
+              "fields": [
+                {
+                  "type": "mrkdwn",
+                  "text": "*Overall Status:* $status_emoji ${{ steps.results.outputs.overall_status }}"
+                },
+                {
+                  "type": "mrkdwn",
+                  "text": "*Environment:* ${{ github.event.inputs.environment || 'staging' }}"
+                }
+              ]
+            },
+            {
+              "type": "section",
+              "text": {
+                "type": "mrkdwn",
+                "text": "*Test Results:*\n• Regression: ${{ steps.results.outputs.regression_result == 'success' && '✅' || '❌' }} ${{ steps.results.outputs.regression_result }}\n• API: ${{ steps.results.outputs.api_result == 'success' && '✅' || '❌' }} ${{ steps.results.outputs.api_result }}\n• Mobile: ${{ steps.results.outputs.mobile_result == 'success' && '✅' || '❌' }} ${{ steps.results.outputs.mobile_result }}\n• Performance: ${{ steps.results.outputs.performance_result == 'success' && '✅' || '❌' }} ${{ steps.results.outputs.performance_result }}\n• Security: ${{ steps.results.outputs.security_result == 'success' && '✅' || '❌' }} ${{ steps.results.outputs.security_result }}\n• Compatibility: ${{ steps.results.outputs.compatibility_result == 'success' && '✅' || '❌' }} ${{ steps.results.outputs.compatibility_result }}"
+              }
+            },
+            {
+              "type": "actions",
+              "elements": [
+                {
+                  "type": "button",
+                  "text": {
+                    "type": "plain_text",
+                    "text": "View Results"
+                  },
+                  "url": "https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+                }
+              ]
+            }
+          ]
+        }
+        EOF
+          )
+          
+          curl -X POST -H 'Content-type: application/json' \
+            --data "$payload" \
+            "$SLACK_WEBHOOK_URL"
+        fi

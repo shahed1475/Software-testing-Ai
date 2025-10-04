@@ -1,0 +1,93 @@
+
+{% extends "base.html" %}
+
+{% block content %}
+<h1 class="page-title">Dashboard</h1>
+
+<div class="grid grid-4">
+    <div class="card">
+        <div class="card-header">
+            <div class="card-title">System Status</div>
+        </div>
+        <div class="grid">
+            <div>
+                <div>Orchestrator</div>
+                <div id="orchestrator-status" class="status status-info">
+                    <span class="status-dot"></span>Loading...
+                </div>
+            </div>
+            <div>
+                <div>Scheduler</div>
+                <div id="scheduler-status" class="status status-info">
+                    <span class="status-dot"></span>Loading...
+                </div>
+            </div>
+            <div>
+                <div>Agents</div>
+                <div id="agents-status" class="status status-info">
+                    <span class="status-dot"></span>Loading...
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="card">
+        <div class="card-header">
+            <div class="card-title">Workflows</div>
+        </div>
+        <div id="workflows-summary">
+            <div class="loading">
+                <div class="spinner"></div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="card">
+        <div class="card-header">
+            <div class="card-title">Recent Executions</div>
+        </div>
+        <div id="executions-summary">
+            <div class="loading">
+                <div class="spinner"></div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="card">
+        <div class="card-header">
+            <div class="card-title">Agents Health</div>
+        </div>
+        <div id="agents-health">
+            <div class="loading">
+                <div class="spinner"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="grid grid-2">
+    <div class="card">
+        <div class="card-header">
+            <div class="card-title">Recent Activity</div>
+            <button class="btn btn-secondary refresh-btn" data-type="activity">Refresh</button>
+        </div>
+        <div id="recent-activity">
+            <div class="loading">
+                <div class="spinner"></div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="card">
+        <div class="card-header">
+            <div class="card-title">System Metrics</div>
+            <button class="btn btn-secondary refresh-btn" data-type="metrics">Refresh</button>
+        </div>
+        <div id="system-metrics">
+            <div class="loading">
+                <div class="spinner"></div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

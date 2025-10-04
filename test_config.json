@@ -1,0 +1,220 @@
+{
+  "test_types": [
+    "unit",
+    "web",
+    "api",
+    "security"
+  ],
+  "output_dir": "test_results",
+  "environment": "local",
+  "branch": "main",
+  "parallel_execution": true,
+  "generate_reports": true,
+  "upload_results": false,
+  
+  "unit_tests": {
+    "markers": ["smoke", "regression"],
+    "coverage_threshold": 80,
+    "fail_under": 70,
+    "include_slow_tests": false,
+    "pytest_args": [
+      "--strict-markers",
+      "--disable-warnings"
+    ]
+  },
+  
+  "web_tests": {
+    "browsers": ["chromium", "firefox"],
+    "headless": true,
+    "workers": 2,
+    "viewport": {
+      "width": 1920,
+      "height": 1080
+    },
+    "timeout": 30000,
+    "screenshot_on_failure": true,
+    "video_recording": false,
+    "trace_on_failure": true,
+    "base_url": "http://localhost:3000",
+    "test_data": {
+      "users": {
+        "admin": {
+          "username": "admin@example.com",
+          "password": "admin123"
+        },
+        "user": {
+          "username": "user@example.com",
+          "password": "user123"
+        }
+      }
+    }
+  },
+  
+  "mobile_tests": {
+    "platform": "android",
+    "device_name": "Android Emulator",
+    "platform_version": "11.0",
+    "app_package": "com.example.app",
+    "app_activity": ".MainActivity",
+    "automation_name": "UiAutomator2",
+    "no_reset": false,
+    "full_reset": false,
+    "timeout": 60000,
+    "screenshot_on_failure": true,
+    "video_recording": false
+  },
+  
+  "api_tests": {
+    "base_url": "http://localhost:8000/api/v1",
+    "timeout": 30,
+    "verify_ssl": false,
+    "auth": {
+      "type": "bearer",
+      "token": null
+    },
+    "headers": {
+      "Content-Type": "application/json",
+      "Accept": "application/json"
+    },
+    "test_data": {
+      "endpoints": [
+        "/health",
+        "/users",
+        "/products",
+        "/orders"
+      ]
+    },
+    "performance_thresholds": {
+      "response_time_ms": 1000,
+      "error_rate_percent": 1
+    }
+  },
+  
+  "security_tests": {
+    "target_url": "http://localhost:8000",
+    "scan_type": "baseline",
+    "max_duration": 300,
+    "spider_timeout": 60,
+    "ajax_spider": true,
+    "passive_scan": true,
+    "active_scan": false,
+    "authentication": {
+      "enabled": false,
+      "login_url": "/login",
+      "username_field": "username",
+      "password_field": "password",
+      "username": "testuser",
+      "password": "testpass"
+    },
+    "exclude_urls": [
+      "/logout",
+      "/admin"
+    ],
+    "alert_thresholds": {
+      "high": 0,
+      "medium": 5,
+      "low": 10
+    }
+  },
+  
+  "performance_tests": {
+    "load_test": {
+      "users": 10,
+      "spawn_rate": 2,
+      "duration": "5m",
+      "host": "http://localhost:8000"
+    },
+    "stress_test": {
+      "users": 100,
+      "spawn_rate": 10,
+      "duration": "10m",
+      "host": "http://localhost:8000"
+    },
+    "thresholds": {
+      "avg_response_time": 1000,
+      "p95_response_time": 2000,
+      "error_rate": 1,
+      "throughput": 100
+    }
+  },
+  
+  "integration_tests": {
+    "services": [
+      "database",
+      "redis",
+      "minio",
+      "external_api"
+    ],
+    "test_data_setup": true,
+    "cleanup_after_tests": true,
+    "retry_failed_tests": 2
+  },
+  
+  "reporting": {
+    "formats": ["html", "json", "junit"],
+    "include_screenshots": true,
+    "include_videos": false,
+    "include_traces": true,
+    "include_logs": true,
+    "consolidate_reports": true,
+    "send_notifications": false,
+    "notification_channels": {
+      "slack": {
+        "webhook_url": null,
+        "channel": "#testing"
+      },
+      "email": {
+        "smtp_server": null,
+        "recipients": []
+      }
+    }
+  },
+  
+  "artifacts": {
+    "retention_days": 30,
+    "compress_artifacts": true,
+    "upload_to_storage": false,
+    "storage_bucket": "test-artifacts"
+  },
+  
+  "monitoring": {
+    "enabled": true,
+    "metrics_endpoint": "http://localhost:9090",
+    "dashboard_url": "http://localhost:3000",
+    "collect_system_metrics": true,
+    "collect_application_metrics": true
+  },
+  
+  "ai_features": {
+    "enabled": false,
+    "test_generation": {
+      "enabled": false,
+      "model": "gpt-4",
+      "max_tests_per_endpoint": 5
+    },
+    "failure_analysis": {
+      "enabled": false,
+      "model": "gpt-4",
+      "include_screenshots": true
+    },
+    "test_optimization": {
+      "enabled": false,
+      "model": "gpt-4",
+      "optimize_selectors": true,
+      "optimize_test_data": true
+    }
+  },
+  
+  "ci_cd": {
+    "enabled": true,
+    "fail_fast": false,
+    "retry_failed_tests": 1,
+    "parallel_jobs": 4,
+    "cache_dependencies": true,
+    "artifact_upload": true,
+    "status_checks": {
+      "required": ["unit", "security"],
+      "optional": ["performance", "integration"]
+    }
+  }
+}

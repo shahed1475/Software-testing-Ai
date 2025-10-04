@@ -1,0 +1,122 @@
+{
+  "users": {
+    "validUser": {
+      "username": "testuser@example.com",
+      "password": "TestPassword123!",
+      "firstName": "John",
+      "lastName": "Doe",
+      "role": "user"
+    },
+    "adminUser": {
+      "username": "admin@example.com",
+      "password": "AdminPassword123!",
+      "firstName": "Admin",
+      "lastName": "User",
+      "role": "admin"
+    },
+    "invalidUser": {
+      "username": "invalid@example.com",
+      "password": "WrongPassword",
+      "firstName": "Invalid",
+      "lastName": "User",
+      "role": "user"
+    }
+  },
+  "products": {
+    "laptop": {
+      "name": "Gaming Laptop",
+      "price": 1299.99,
+      "category": "Electronics",
+      "description": "High-performance gaming laptop with RTX graphics",
+      "inStock": true,
+      "sku": "LAP-001"
+    },
+    "smartphone": {
+      "name": "Smartphone Pro",
+      "price": 899.99,
+      "category": "Electronics",
+      "description": "Latest smartphone with advanced camera features",
+      "inStock": true,
+      "sku": "PHN-001"
+    },
+    "headphones": {
+      "name": "Wireless Headphones",
+      "price": 199.99,
+      "category": "Audio",
+      "description": "Premium wireless headphones with noise cancellation",
+      "inStock": false,
+      "sku": "AUD-001"
+    }
+  },
+  "forms": {
+    "contactForm": {
+      "name": "Test User",
+      "email": "testuser@example.com",
+      "subject": "Test Inquiry",
+      "message": "This is a test message for automated testing purposes."
+    },
+    "registrationForm": {
+      "firstName": "Jane",
+      "lastName": "Smith",
+      "email": "jane.smith@example.com",
+      "password": "SecurePassword123!",
+      "confirmPassword": "SecurePassword123!",
+      "phoneNumber": "+1234567890",
+      "dateOfBirth": "1990-01-01",
+      "agreeToTerms": true
+    }
+  },
+  "api": {
+    "endpoints": {
+      "login": "/api/auth/login",
+      "logout": "/api/auth/logout",
+      "users": "/api/users",
+      "products": "/api/products",
+      "orders": "/api/orders"
+    },
+    "headers": {
+      "contentType": "application/json",
+      "accept": "application/json"
+    }
+  },
+  "search": {
+    "validQueries": [
+      "laptop",
+      "smartphone",
+      "headphones",
+      "electronics"
+    ],
+    "invalidQueries": [
+      "",
+      "   ",
+      "nonexistentproduct123",
+      "!@#$%^&*()"
+    ]
+  },
+  "navigation": {
+    "mainMenuItems": [
+      "Home",
+      "Products",
+      "About",
+      "Contact",
+      "Login"
+    ],
+    "footerLinks": [
+      "Privacy Policy",
+      "Terms of Service",
+      "Support",
+      "FAQ"
+    ]
+  },
+  "timeouts": {
+    "short": 5000,
+    "medium": 10000,
+    "long": 30000,
+    "api": 15000
+  },
+  "urls": {
+    "staging": "https://staging.example.com",
+    "production": "https://example.com",
+    "api": "https://api.example.com"
+  }
+}
