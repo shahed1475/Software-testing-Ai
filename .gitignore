@@ -140,6 +140,8 @@ pids
 *.pid
 *.seed
 *.pid.lock
+runtime/
+templates/
 
 # Coverage directory used by tools like istanbul
 coverage/

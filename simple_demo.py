@@ -39,32 +39,53 @@ class SimpleDemoRunner:
         return {
             "test_scenarios": [
                 {
-                    "name": "🔧 API Tests",
+                    "name": "API Tests",
                     "type": "api",
                     "workflow": "test-api.yml",
                     "expected_duration": 300,
-                    "description": "Comprehensive API testing suite with authentication, CRUD operations, and data validation"
+                    "description": "API regression and contract validation"
                 },
                 {
-                    "name": "🌐 Web UI Tests",
+                    "name": "Web UI Tests",
                     "type": "web",
-                    "workflow": "test-web.yml", 
+                    "workflow": "test-web.yml",
                     "expected_duration": 600,
-                    "description": "End-to-end web UI testing including user flows, responsive design, and accessibility"
+                    "description": "End-to-end web UI flows and accessibility"
                 },
                 {
-                    "name": "🔒 Security Tests",
+                    "name": "Security Tests",
                     "type": "security",
                     "workflow": "test-security.yml",
                     "expected_duration": 900,
-                    "description": "Security vulnerability scanning with OWASP ZAP, Snyk, and custom security tests"
+                    "description": "Security scanning and dependency checks"
                 },
                 {
-                    "name": "📱 Mobile Tests",
+                    "name": "Mobile Tests",
                     "type": "mobile",
                     "workflow": "test-mobile.yml",
                     "expected_duration": 450,
-                    "description": "Mobile app testing suite for iOS and Android platforms"
+                    "description": "Mobile regression suite for iOS and Android"
+                },
+                {
+                    "name": "PenTest Web Surface",
+                    "type": "pentest_web",
+                    "workflow": "pentest-web.yml",
+                    "expected_duration": 700,
+                    "description": "Web surface probing, auth checks, and OWASP top 10"
+                },
+                {
+                    "name": "PenTest API Surface",
+                    "type": "pentest_api",
+                    "workflow": "pentest-api.yml",
+                    "expected_duration": 650,
+                    "description": "API fuzzing, auth bypass checks, and schema abuse"
+                },
+                {
+                    "name": "PenTest Network",
+                    "type": "pentest_network",
+                    "workflow": "pentest-network.yml",
+                    "expected_duration": 800,
+                    "description": "Network service discovery and misconfiguration checks"
                 }
             ],
             "mock_results": {
@@ -102,7 +123,7 @@ class SimpleDemoRunner:
                     "coverage": 89.3,
                     "vulnerabilities": [
                         {"severity": "HIGH", "type": "SQL Injection", "location": "/api/users", "cve": "CWE-89"},
-                        {"severity": "MEDIUM", "type": "Cross-Site Scripting (XSS)", "location": "/dashboard", "cve": "CWE-79"},
+                        {"severity": "MEDIUM", "type": "Cross-Site Scripting", "location": "/dashboard", "cve": "CWE-79"},
                         {"severity": "LOW", "type": "Information Disclosure", "location": "/health", "cve": "CWE-200"}
                     ]
                 },
@@ -116,6 +137,48 @@ class SimpleDemoRunner:
                     "failures": [
                         {"test": "test_push_notifications", "error": "Permission denied for notification access"},
                         {"test": "test_offline_mode", "error": "Network simulation failed - unable to disable connectivity"}
+                    ]
+                },
+                "pentest_web": {
+                    "total_tests": 18,
+                    "passed": 12,
+                    "failed": 6,
+                    "skipped": 0,
+                    "duration": 640,
+                    "coverage": 0,
+                    "vulnerabilities": [
+                        {"severity": "HIGH", "type": "Auth Bypass", "location": "/admin"},
+                        {"severity": "HIGH", "type": "Sensitive Data Exposure", "location": "/reports/export"},
+                        {"severity": "MEDIUM", "type": "IDOR", "location": "/api/orders/"},
+                        {"severity": "MEDIUM", "type": "Weak Session Cookies", "location": "/login"},
+                        {"severity": "LOW", "type": "Verbose Errors", "location": "/search"}
+                    ]
+                },
+                "pentest_api": {
+                    "total_tests": 16,
+                    "passed": 11,
+                    "failed": 5,
+                    "skipped": 0,
+                    "duration": 590,
+                    "coverage": 0,
+                    "vulnerabilities": [
+                        {"severity": "HIGH", "type": "Broken Object Level Auth", "location": "/api/v1/users"},
+                        {"severity": "MEDIUM", "type": "Mass Assignment", "location": "/api/v1/profile"},
+                        {"severity": "MEDIUM", "type": "Rate Limit Missing", "location": "/api/v1/auth"},
+                        {"severity": "LOW", "type": "Version Disclosure", "location": "/api/v1/status"}
+                    ]
+                },
+                "pentest_network": {
+                    "total_tests": 12,
+                    "passed": 8,
+                    "failed": 4,
+                    "skipped": 0,
+                    "duration": 720,
+                    "coverage": 0,
+                    "vulnerabilities": [
+                        {"severity": "HIGH", "type": "Open Admin Port", "location": "tcp/2375"},
+                        {"severity": "MEDIUM", "type": "TLS Weak Cipher", "location": "tcp/443"},
+                        {"severity": "LOW", "type": "Banner Disclosure", "location": "tcp/22"}
                     ]
                 }
             }
@@ -482,3 +545,4 @@ async def main():
 
 if __name__ == "__main__":
     asyncio.run(main())
+
